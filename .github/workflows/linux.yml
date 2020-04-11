@@ -1,0 +1,366 @@
+name: Linux.
+
+on:
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+  pull_request:
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+
+jobs:
+
+  linux:
+    name: Ubuntu 14.04
+    runs-on: ubuntu-latest
+    container: ubuntu:trusty
+
+    strategy:
+      matrix:
+        defines:
+          - ""
+
+    env:
+      GIT: "https://github.com"
+      QT: "5_12_5"
+      QT_PREFIX: "/usr/local/desktop-app/Qt-5.12.5"
+      OPENSSL_VER: "1_1_1"
+      OPENSSL_PREFIX: "/usr/local/desktop-app/openssl-1.1.1"
+      CMAKE_VER: "3.17.0"
+      UPLOAD_ARTIFACT: "false"
+      ONLY_CACHE: "false"
+      MANUAL_CACHING: "1"
+      DOC_PATH: "docs/building-cmake.md"
+      AUTO_CACHING: "1"
+
+    steps:
+      - name: Get repository name.
+        run: echo ::set-env name=REPO_NAME::${GITHUB_REPOSITORY##*/}
+
+      - name: Disable man for further package installs.
+        run: |
+          cfgFile="/etc/dpkg/dpkg.cfg.d/no_man"
+          sudo touch $cfgFile
+          p() {
+            sudo echo "path-exclude=/usr/share/$1/*" >> $cfgFile
+          }
+
+          p man
+          p locale
+          p doc
+
+      - name: Apt install.
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install software-properties-common -y && \
+          sudo add-apt-repository ppa:git-core/ppa -y && \
+          sudo apt-get update && \
+          sudo apt-get install git libexif-dev liblzma-dev libz-dev libssl-dev \
+          libgtk2.0-dev libice-dev libsm-dev libicu-dev libdrm-dev dh-autoreconf \
+          autoconf automake build-essential libxml2-dev libass-dev libfreetype6-dev \
+          libgpac-dev libsdl1.2-dev libtheora-dev libtool libva-dev libvdpau-dev \
+          libvorbis-dev libenchant-dev libxcb1-dev libxcb-image0-dev libxcb-shm0-dev \
+          libxcb-xfixes0-dev libxcb-keysyms1-dev libxcb-icccm4-dev libatspi2.0-dev \
+          libxcb-render-util0-dev libxcb-util0-dev libxcb-xkb-dev libxrender-dev \
+          libasound-dev libpulse-dev libxcb-sync0-dev libxcb-randr0-dev libegl1-mesa-dev \
+          libx11-xcb-dev libffi-dev libncurses5-dev pkg-config texi2html bison yasm \
+          zlib1g-dev xutils-dev python-xcbgen chrpath gperf -y --force-yes && \
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y && \
+          sudo apt-get update && \
+          sudo apt-get install gcc-8 g++-8 -y && \
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 60 && \
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-8 60 && \
+          sudo update-alternatives --config gcc && \
+          sudo add-apt-repository --remove ppa:ubuntu-toolchain-r/test -y
+
+      - name: Clone.
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+          path: ${{ env.REPO_NAME }}
+
+      - name: First set up.
+        shell: bash
+        run: |
+          gcc --version
+
+          gcc --version > CACHE_KEY.txt
+          echo $MANUAL_CACHING >> CACHE_KEY.txt
+          if [ "$AUTO_CACHING" == "1" ]; then
+            thisFile=$REPO_NAME/.github/workflows/linux.yml
+            echo `md5sum $thisFile | cut -c -32` >> CACHE_KEY.txt
+          fi
+          md5cache=$(md5sum CACHE_KEY.txt | cut -c -32)
+          echo ::set-env name=CACHE_KEY::$md5cache
+
+          mkdir -p Libraries
+          cd Libraries
+          echo ::set-env name=LibrariesPath::`pwd`
+
+      - name: Range-v3.
+        run: |
+          echo "Find necessary branch from doc."
+          cloneRange=$(grep -A 1 "range-v3" $REPO_NAME/$DOC_PATH | sed -n 1p)
+          cd $LibrariesPath
+          echo $cloneRange
+          eval $cloneRange
+
+      - name: Patches.
+        run: |
+          echo "Find necessary commit from doc."
+          checkoutCommit=$(grep -A 1 "cd patches" $REPO_NAME/$DOC_PATH | sed -n 2p)
+          cd $LibrariesPath
+          git clone $GIT/desktop-app/patches.git
+          cd patches
+          eval $checkoutCommit
+
+      - name: CMake.
+        run: |
+          cd $LibrariesPath
+
+          file=cmake-$CMAKE_VER-Linux-x86_64.sh
+          wget $GIT/Kitware/CMake/releases/download/v$CMAKE_VER/$file
+          sudo mkdir /opt/cmake
+          sudo sh $file --prefix=/opt/cmake --skip-license
+          sudo ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake
+          rm $file
+
+          cmake --version
+
+      - name: OpenSSL cache.
+        id: cache-openssl
+        uses: actions/cache@v1
+        with:
+          path: ${{ env.LibrariesPath }}/openssl-cache
+          key: ${{ runner.OS }}-${{ env.OPENSSL_VER }}-${{ env.CACHE_KEY }}
+      - name: OpenSSL build.
+        if: steps.cache-openssl.outputs.cache-hit != 'true'
+        run: |
+          cd $LibrariesPath
+
+          opensslDir=openssl_${OPENSSL_VER}
+          git clone -b OpenSSL_${OPENSSL_VER}-stable --depth=1 \
+            $GIT/openssl/openssl $opensslDir
+          cd $opensslDir
+          ./config --prefix=$LibrariesPath/openssl-cache
+          make -j$(nproc)
+          sudo make install_sw
+          cd ..
+          rm -rf $opensslDir
+      - name: OpenSSL install.
+        run: |
+          cd $LibrariesPath
+          sudo mkdir -p $OPENSSL_PREFIX
+          sudo cp -R openssl-cache/. $OPENSSL_PREFIX/
+
+      - name: Libxkbcommon.
+        run: |
+          cd $LibrariesPath
+
+          git clone -b xkbcommon-0.8.4 --depth=1 $GIT/xkbcommon/libxkbcommon.git
+          cd libxkbcommon
+          ./autogen.sh
+          make -j$(nproc)
+          sudo make install
+          cd ..
+          rm -rf libxkbcommon
+
+      - name: Libwayland.
+        run: |
+          cd $LibrariesPath
+
+          git clone -b 1.16 https://gitlab.freedesktop.org/wayland/wayland
+          cd wayland
+          ./autogen.sh --enable-static --disable-documentation
+          make -j$(nproc)
+          sudo make install
+          cd ..
+          rm -rf wayland
+
+      - name: Qt 5.12.5 cache.
+        id: cache-qt
+        uses: actions/cache@v1
+        with:
+          path: ${{ env.LibrariesPath }}/qt-cache
+          key: ${{ runner.OS }}-qt-${{ env.CACHE_KEY }}-${{ hashFiles('**/qtbase_5_12_5.diff') }}
+      - name: Qt 5.12.5 build.
+        if: steps.cache-qt.outputs.cache-hit != 'true'
+        run: |
+          cd $LibrariesPath
+
+          git clone -b v5.12.5 --depth=1 git://code.qt.io/qt/qt5.git qt_${QT}
+          cd qt_${QT}
+          perl init-repository --module-subset=qtbase,qtwayland,qtimageformats,qtsvg
+          git submodule update qtbase qtwayland qtimageformats qtsvg
+          cd qtbase
+          git apply ../../patches/qtbase_${QT}.diff
+          cd src/plugins/platforminputcontexts
+          git clone $GIT/desktop-app/fcitx.git
+          git clone $GIT/desktop-app/hime.git
+          git clone $GIT/desktop-app/nimf.git
+          cd ../../../..
+
+          ./configure -prefix "$LibrariesPath/qt-cache" \
+          -release \
+          -force-debug-info \
+          -opensource \
+          -confirm-license \
+          -qt-zlib \
+          -qt-libpng \
+          -qt-libjpeg \
+          -qt-harfbuzz \
+          -qt-pcre \
+          -qt-xcb \
+          -system-freetype \
+          -fontconfig \
+          -no-gtk \
+          -static \
+          -dbus-runtime \
+          -openssl-linked \
+          -I "$OPENSSL_PREFIX/include" OPENSSL_LIBS="$OPENSSL_PREFIX/lib/libssl.a $OPENSSL_PREFIX/lib/libcrypto.a -ldl -lpthread" \
+          -nomake examples \
+          -nomake tests
+
+          make -j$(nproc)
+          sudo make install
+          cd ..
+          rm -rf qt_${QT}
+      - name: Qt 5.12.5 install.
+        run: |
+          cd $LibrariesPath
+          sudo mkdir -p $QT_PREFIX
+          sudo cp -R qt-cache/. $QT_PREFIX/
+
+      - name: Breakpad cache.
+        id: cache-breakpad
+        uses: actions/cache@v1
+        with:
+          path: ${{ env.LibrariesPath }}/breakpad-cache
+          key: ${{ runner.OS }}-breakpad-${{ env.CACHE_KEY }}
+      - name: Breakpad clone.
+        run: |
+          cd $LibrariesPath
+
+          git clone https://chromium.googlesource.com/breakpad/breakpad
+          cd breakpad
+          git checkout bc8fb886
+          git clone https://chromium.googlesource.com/linux-syscall-support src/third_party/lss
+          cd src/third_party/lss
+          git checkout a91633d1
+      - name: Breakpad build.
+        if: steps.cache-breakpad.outputs.cache-hit != 'true'
+        run: |
+          cd $LibrariesPath
+
+          BreakpadCache=$LibrariesPath/breakpad-cache
+
+          git clone https://chromium.googlesource.com/external/gyp
+          cd gyp
+          git checkout 9f2a7bb1
+          git apply ../patches/gyp.diff
+          cd ..
+
+          cd breakpad
+          ./configure --prefix=$BreakpadCache
+          make -j$(nproc)
+          sudo make install
+          cd src
+          rm -r testing
+          git clone $GIT/google/googletest testing
+          cd tools
+          sed -i 's/minidump_upload.m/minidump_upload.cc/' linux/tools_linux.gypi
+          ../../../gyp/gyp  --depth=. --generator-output=.. -Goutput_dir=../out tools.gyp --format=cmake
+          cd ../../out/Default
+          cmake .
+          make -j$(nproc) dump_syms
+
+          mv dump_syms $BreakpadCache/
+          cd ..
+          rm -rf gyp breakpad
+      - name: Breakpad install.
+        run: |
+          cd $LibrariesPath
+          sudo cp -R breakpad-cache/. /usr/local/
+          mkdir -p breakpad/out/Default/
+          cp breakpad-cache/dump_syms breakpad/out/Default/dump_syms
+      - name: TON cache.
+        id: cache-ton
+        uses: actions/cache@v1
+        with:
+          path: ${{ env.LibrariesPath }}/ton-cache
+          key: ${{ runner.OS }}-${{ env.OPENSSL_VER }}-${{ env.CACHE_KEY }}
+      - name: TON build.
+        if: steps.cache-ton.outputs.cache-hit != 'true'
+        run: |
+          cd $LibrariesPath
+
+          git clone https://github.com/ton-blockchain/ton.git
+          cd ton
+          git checkout be9c34c6
+          git submodule init
+          git submodule update third-party/crc32c
+          mkdir build-debug
+          cd build-debug
+          
+          cmake \
+          -DTON_USE_ROCKSDB=OFF \
+          -DTON_USE_ABSEIL=OFF \
+          -DTON_ONLY_TONLIB=ON \
+          -DOPENSSL_FOUND=1 \
+          -DOPENSSL_INCLUDE_DIR=/usr/local/desktop-app/openssl-1.1.1/include \
+          -DOPENSSL_CRYPTO_LIBRARY=/usr/local/desktop-app/openssl-1.1.1/lib/libcrypto.a \
+          -DTON_ARCH=`uname -m | sed --expression='s/_/-/g'` \
+          ..
+
+          make -j$(nproc) tonlib
+          cd ..
+          mv build-debug $LibrariesPath/ton-cache
+
+      - name: Wallet build.
+        if: env.ONLY_CACHE == 'false'
+        run: |
+          cd $REPO_NAME/Wallet
+
+          DEFINE=""
+          if [ -n "${{ matrix.defines }}" ]; then
+            DEFINE="-D ${{ matrix.defines }}=ON"
+            echo Define from matrix: $DEFINE
+          fi
+
+          ./configure.sh \
+          -D CMAKE_CXX_FLAGS="-s" \
+          -D DESKTOP_APP_USE_PACKAGED=OFF \
+          $DEFINE
+
+          cd ../out/Debug
+          make -j$(nproc)
+
+      - name: Check.
+        if: env.ONLY_CACHE == 'false'
+        run: |
+          filePath="$REPO_NAME/out/Debug/bin/Wallet"
+          if test -f "$filePath"; then
+            echo "Build successfully done! :)"
+
+            size=$(stat -c %s "$filePath")
+            echo "File size of ${filePath}: ${size} Bytes."
+          else
+            echo "Build error, output file does not exist."
+            exit 1
+          fi
+
+      - name: Move artifact.
+        if: env.UPLOAD_ARTIFACT == 'true'
+        run: |
+          cd $REPO_NAME/out/Debug/bin
+          mkdir artifact
+          mv Wallet artifact/
+      - uses: actions/upload-artifact@master
+        if: env.UPLOAD_ARTIFACT == 'true'
+        name: Upload artifact.
+        with:
+          name: Wallet
+          path: ${{ env.REPO_NAME }}/out/Debug/bin/artifact/
