@@ -42,7 +42,7 @@
 	url = https://github.com/desktop-app/lib_storage.git
 [submodule "Wallet/lib_wallet"]
 	path = Wallet/lib_wallet
-	url = https://github.com/desktop-app/lib_wallet.git
+	url = https://github.com/tginfo/lib_wallet_desktop.git
 [submodule "Wallet/ThirdParty/expected"]
 	path = Wallet/ThirdParty/expected
 	url = https://github.com/TartanLlama/expected
