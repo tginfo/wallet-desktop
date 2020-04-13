@@ -290,7 +290,7 @@ jobs:
         id: cache-ton
         uses: actions/cache@v1
         with:
-          path: ${{ env.LibrariesPath }}/ton-cache
+          path: ${{ env.LibrariesPath }}/ton
           key: ${{ runner.OS }}-${{ env.OPENSSL_VER }}-${{ env.CACHE_KEY }}
       - name: TON build.
         if: steps.cache-ton.outputs.cache-hit != 'true'
@@ -317,7 +317,6 @@ jobs:
 
           make -j$(nproc) tonlib
           cd ..
-          mv build-debug $LibrariesPath/ton-cache
 
       - name: Wallet build.
         if: env.ONLY_CACHE == 'false'
