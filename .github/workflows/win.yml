@@ -251,13 +251,17 @@ jobs:
 
           cd ..
           rmdir /S /Q qt_%QT%
-
+      - name: Find TON commit from doc.
+        shell: bash
+        run: |
+          echo "Find necessary commit from doc."
+          echo ::set-env name=TON_COMMIT::`grep -A 1 "cd ton" $REPO_NAME/$DOC_PATH | sed -n 2p`
       - name: TON cache.
         id: cache-ton
         uses: actions/cache@v1
         with:
           path: ${{ env.LibrariesPath }}/ton
-          key: ${{ runner.OS }}-ton-${{ env.CACHE_KEY }}-${{ hashFiles('**/ton.diff') }}
+          key: ${{ runner.OS }}-ton-${{ env.TON_COMMIT }}-${{ hashFiles('**/ton.diff') }}
       - name: TON.
         env:
           GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\'
@@ -269,7 +273,7 @@ jobs:
 
           git clone https://github.com/ton-blockchain/ton.git
           cd ton
-          git checkout be9c34c6
+          git checkout %TON_COMMIT%
           git submodule init
           git submodule update third-party/crc32c
           mkdir build-debug
