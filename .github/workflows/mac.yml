@@ -209,7 +209,7 @@ jobs:
       - name: Find TON commit from doc.
         run: |
           echo "Find necessary commit from doc."
-          echo ::set-env name=TON_COMMIT::`grep -A 1 "cd ton" $REPO_NAME/$DOC_PATH | sed -n 2p`
+          echo ::set-env name=TON_COMMIT::`grep -A 1 "cd ton" $REPO_NAME/$DOC_PATH | sed -n 2p | awk '{print $3}'`
       - name: TON cache.
         id: cache-ton
         uses: actions/cache@v1
