@@ -88,7 +88,8 @@ Updater::InfoForRegistry GetInfoForRegistry() {
 #endif // WALLET_AUTOUPDATING_BUILD
 
 base::Platform::UrlSchemeDescriptor CustomSchemeDescriptor(
-		not_null<Launcher*> launcher) {
+		not_null<Launcher*> launcher,
+		bool updateIcon = false) {
 	auto result = base::Platform::UrlSchemeDescriptor();
 	result.executable = base::Integration::Instance().executablePath();
 	result.protocol = "ton";
@@ -100,6 +101,7 @@ base::Platform::UrlSchemeDescriptor CustomSchemeDescriptor(
 	result.longAppName = "GramWallet";
 	result.displayAppName = "Gram Wallet";
 	result.displayAppDescription = "Desktop wallet for TON";
+	result.forceUpdateIcon = updateIcon;
 	return result;
 }
 
@@ -155,7 +157,24 @@ QString Launcher::computeWorkingPathBase() {
 }
 
 void Launcher::registerUrlScheme() {
-	base::Platform::RegisterUrlScheme(CustomSchemeDescriptor(this));
+	constexpr auto kSchemeVersion = 2;
+	const auto path = _workingPath + "scheme_version";
+	const auto version = [&] {
+		auto file = QFile(path);
+		if (!file.open(QIODevice::ReadOnly)) {
+			return 0;
+		}
+		return file.readAll().toInt();
+	}();
+	const auto guard = gsl::finally([&] {
+		if (version < kSchemeVersion) {
+			auto file = QFile(path);
+			if (file.open(QIODevice::WriteOnly)) {
+				file.write(QString::number(kSchemeVersion).toUtf8());
+			}
+		}
+	});
+	base::Platform::RegisterUrlScheme(CustomSchemeDescriptor(this, version < kSchemeVersion));
 }
 
 void Launcher::cleanupUrlScheme() {
@@ -363,8 +382,19 @@ void Launcher::initAppDataPath() {
 void Launcher::processArguments() {
 	_arguments = readArguments(_argc, _argv);
 
-	auto nextUrl = false;
+	enum class UrlState {
+		None,
+		Next,
+		Done,
+		Error,
+	};
+	auto urlState = UrlState::None;
 	for (const auto &argument : _arguments) {
+		if (urlState == UrlState::Done) {
+			WALLET_LOG(("App Error: Ignoring URL argument (not last one)."));
+			_openedUrl = QString();
+			urlState = UrlState::Error;
+		}
 		if (argument == "cleanup") {
 			_action = Action::Cleanup;
 		} else if (argument == "installupdate") {
@@ -372,12 +402,21 @@ void Launcher::processArguments() {
 			break;
 		} else if (argument == "--verbose") {
 			_verbose = true;
-		} else if (nextUrl) {
+		} else if (urlState == UrlState::Next) {
 			_openedUrl = argument;
-		} else if (argument == "--") {
-			nextUrl = true;
+			urlState = UrlState::Done;
+		} else if (urlState == UrlState::None && argument == "--") {
+			urlState = UrlState::Next;
 		}
 	}
+#ifdef Q_OS_WIN
+	if (!_openedUrl.isEmpty()
+		&& !base::Platform::CheckUrlScheme(CustomSchemeDescriptor(this))) {
+		WALLET_LOG(("App Error: Ignoring URL argument (bad registration)."));
+		_openedUrl = QString();
+		registerUrlScheme();
+	}
+#endif // Q_OS_WIN
 }
 
 int Launcher::executeApplication() {
