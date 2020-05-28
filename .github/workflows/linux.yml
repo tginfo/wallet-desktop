@@ -204,7 +204,7 @@ jobs:
           cd ../../../..
 
           ./configure -prefix "$LibrariesPath/qt-cache" \
-          -release \
+          -debug \
           -force-debug-info \
           -opensource \
           -confirm-license \
