@@ -151,7 +151,13 @@ jobs:
           cd zlib
           git checkout tdesktop
           cd contrib\vstudio\vc14
-          msbuild -m zlibstat.vcxproj /property:Configuration=${{ matrix.build }}
+
+          SET CONFIGURATION="${{ matrix.build }}"
+          if "${{ matrix.build }}" == "Release" (
+            SET CONFIGURATION="ReleaseWithoutAsm"
+          )
+
+          msbuild -m zlibstat.vcxproj "/property:Configuration=%CONFIGURATION%"
 
       - name: Breakpad cache.
         id: cache-breakpad
