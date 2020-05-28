@@ -207,7 +207,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: ${{ env.LibrariesPath }}/Qt-5.12.8
-          key: ${{ runner.OS }}-qt-${{ env.CACHE_KEY }}-${{ hashFiles('**/qtbase_5_12_8.diff') }}
+          key: ${{ runner.OS }}-qt-${{ env.CACHE_KEY }}-${{ hashFiles('**/qtbase_5_12_8.diff') }}-${{ matrix.build }}
       - name: Configure Qt 5.12.8.
         if: steps.cache-qt.outputs.cache-hit != 'true'
         shell: cmd
@@ -269,7 +269,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: ${{ env.LibrariesPath }}/ton
-          key: ${{ runner.OS }}-ton-${{ env.TON_COMMIT }}-${{ hashFiles('**/ton.diff') }}
+          key: ${{ runner.OS }}-ton-${{ env.TON_COMMIT }}-${{ hashFiles('**/ton.diff') }}-${{ matrix.build }}
       - name: TON.
         env:
           GYP_MSVS_OVERRIDE_PATH: 'C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\'
