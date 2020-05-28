@@ -233,26 +233,41 @@ jobs:
           SET SSL=%LibrariesPath%\openssl_1_1_1
           SET LIBS=libcrypto.lib Ws2_32.lib Gdi32.lib Advapi32.lib Crypt32.lib User32.lib
 
-          SET CONFIGURE_PARAMS="-release "
           if "${{ matrix.build }}" == "Debug" (
-            SET CONFIGURE_PARAMS="-debug -force-debug-info "
+            configure ^
+            -prefix "%LibrariesPath%\Qt-5.12.8" ^
+            -debug ^
+            -force-debug-info ^
+            -opensource ^
+            -confirm-license ^
+            -static ^
+            -static-runtime -I "%SSL%\include" ^
+            -no-opengl ^
+            -openssl-linked ^
+            OPENSSL_LIBS_DEBUG="%SSL%\out32.dbg\libssl.lib %SSL%\out32.dbg\%LIBS%" ^
+            OPENSSL_LIBS_RELEASE="%SSL%\out32\libssl.lib %SSL%\out32\%LIBS%" ^
+            -mp ^
+            -nomake examples ^
+            -nomake tests ^
+            -platform win32-msvc
+          ) else (
+            configure ^
+            -prefix "%LibrariesPath%\Qt-5.12.8" ^
+            -release ^
+            -opensource ^
+            -confirm-license ^
+            -static ^
+            -static-runtime -I "%SSL%\include" ^
+            -no-opengl ^
+            -openssl-linked ^
+            OPENSSL_LIBS_DEBUG="%SSL%\out32.dbg\libssl.lib %SSL%\out32.dbg\%LIBS%" ^
+            OPENSSL_LIBS_RELEASE="%SSL%\out32\libssl.lib %SSL%\out32\%LIBS%" ^
+            -mp ^
+            -nomake examples ^
+            -nomake tests ^
+            -platform win32-msvc
           )
 
-          configure ^
-          -prefix "%LibrariesPath%\Qt-5.12.8" ^
-          %CONFIGURE_PARAMS% ^
-          -opensource ^
-          -confirm-license ^
-          -static ^
-          -static-runtime -I "%SSL%\include" ^
-          -no-opengl ^
-          -openssl-linked ^
-          OPENSSL_LIBS_DEBUG="%SSL%\out32.dbg\libssl.lib %SSL%\out32.dbg\%LIBS%" ^
-          OPENSSL_LIBS_RELEASE="%SSL%\out32\libssl.lib %SSL%\out32\%LIBS%" ^
-          -mp ^
-          -nomake examples ^
-          -nomake tests ^
-          -platform win32-msvc
       - name: Qt 5.12.8 build.
         if: steps.cache-qt.outputs.cache-hit != 'true'
         shell: cmd
