@@ -107,7 +107,7 @@ jobs:
           git clone %GIT%/telegramdesktop/lzma.git
           cd lzma
           cd C\Util\LzmaLib
-          msbuild -m LzmaLib.sln /property:Configuration={{ matrix.build }}
+          msbuild -m LzmaLib.sln /property:Configuration=${{ matrix.build }}
 
       - name: OpenSSL cache.
         id: cache-openssl
@@ -151,7 +151,7 @@ jobs:
           cd zlib
           git checkout tdesktop
           cd contrib\vstudio\vc14
-          msbuild -m zlibstat.vcxproj /property:Configuration={{ matrix.build }}
+          msbuild -m zlibstat.vcxproj /property:Configuration=${{ matrix.build }}
 
       - name: Breakpad cache.
         id: cache-breakpad
@@ -228,7 +228,7 @@ jobs:
           SET LIBS=libcrypto.lib Ws2_32.lib Gdi32.lib Advapi32.lib Crypt32.lib User32.lib
 
           SET CONFIGURE_PARAMS="-release "
-          if "{{ matrix.build }}" == "Debug" (
+          if "${{ matrix.build }}" == "Debug" (
             SET CONFIGURE_PARAMS="-debug -force-debug-info "
           )
 
@@ -285,7 +285,7 @@ jobs:
           git submodule init
           git submodule update third-party/crc32c
 
-          if "{{ matrix.build }}" == "Debug" (
+          if "${{ matrix.build }}" == "Debug" (
             mkdir build-debug
             cd build-debug
 
