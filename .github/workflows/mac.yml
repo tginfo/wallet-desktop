@@ -3,12 +3,30 @@ name: MacOS.
 on:
   push:
     paths-ignore:
+      - '**.md'
+      - '**.bat'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/mac.yml'
       - 'docs/**'
-      - '*.md'
+      - '!docs/building-xcode.md'
+      - 'Wallet/build/**'
+      - 'Wallet/resources/win/**'
   pull_request:
     paths-ignore:
+      - '**.md'
+      - '**.bat'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/mac.yml'
       - 'docs/**'
-      - '*.md'
+      - '!docs/building-xcode.md'
+      - 'Wallet/build/**'
+      - 'Wallet/resources/win/**'
 
 jobs:
 

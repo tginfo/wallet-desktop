@@ -3,12 +3,32 @@ name: Linux.
 on:
   push:
     paths-ignore:
+      - '**.md'
+      - '**.bat'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/linux.yml'
       - 'docs/**'
-      - '*.md'
+      - '!docs/building-cmake.md'
+      - 'Wallet/build/**'
+      - 'Wallet/resources/win/**'
+      - 'Wallet/resources/mac/**'
   pull_request:
     paths-ignore:
+      - '**.md'
+      - '**.bat'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/linux.yml'
       - 'docs/**'
-      - '*.md'
+      - '!docs/building-cmake.md'
+      - 'Wallet/build/**'
+      - 'Wallet/resources/win/**'
+      - 'Wallet/resources/mac/**'
 
 jobs:
 

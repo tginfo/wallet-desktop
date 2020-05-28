@@ -3,12 +3,30 @@ name: Windows.
 on:
   push:
     paths-ignore:
+      - '**.md'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/win.yml'
       - 'docs/**'
-      - '*.md'
+      - '!docs/building-msvc.md'
+      - 'Wallet/build/**'
+      - 'Wallet/resources/mac/**'
+      - 'Wallet/configure.sh'
   pull_request:
     paths-ignore:
+      - '**.md'
+      - 'changelog.txt'
+      - 'LEGAL'
+      - 'LICENSE'
+      - '.github/**'
+      - '!.github/workflows/win.yml'
       - 'docs/**'
-      - '*.md'
+      - '!docs/building-msvc.md'
+      - 'Wallet/build/**'
+      - 'Wallet/resources/mac/**'
+      - 'Wallet/configure.sh'
 
 jobs:
 
