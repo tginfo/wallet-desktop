@@ -20,6 +20,10 @@ jobs:
       matrix:
         defines:
           - ""
+        build:
+          - "Debug"
+          - "Release"
+
     env:
       SDK: "10.0.18362.0"
       VC: "call vcvars32.bat && cd Libraries"
@@ -103,7 +107,7 @@ jobs:
           git clone %GIT%/telegramdesktop/lzma.git
           cd lzma
           cd C\Util\LzmaLib
-          msbuild -m LzmaLib.sln /property:Configuration=Debug
+          msbuild -m LzmaLib.sln /property:Configuration={{ matrix.build }}
 
       - name: OpenSSL cache.
         id: cache-openssl
@@ -147,7 +151,7 @@ jobs:
           cd zlib
           git checkout tdesktop
           cd contrib\vstudio\vc14
-          msbuild -m zlibstat.vcxproj /property:Configuration=Debug
+          msbuild -m zlibstat.vcxproj /property:Configuration={{ matrix.build }}
 
       - name: Breakpad cache.
         id: cache-breakpad
@@ -223,10 +227,14 @@ jobs:
           SET SSL=%LibrariesPath%\openssl_1_1_1
           SET LIBS=libcrypto.lib Ws2_32.lib Gdi32.lib Advapi32.lib Crypt32.lib User32.lib
 
+          SET CONFIGURE_PARAMS="-release "
+          if "{{ matrix.build }}" == "Debug" (
+            SET CONFIGURE_PARAMS="-debug -force-debug-info "
+          )
+
           configure ^
           -prefix "%LibrariesPath%\Qt-5.12.8" ^
-          -debug ^
-          -force-debug-info ^
+          %CONFIGURE_PARAMS% ^
           -opensource ^
           -confirm-license ^
           -static ^
@@ -276,26 +284,47 @@ jobs:
           git checkout %TON_COMMIT%
           git submodule init
           git submodule update third-party/crc32c
-          mkdir build-debug
-          cd build-debug
 
-          cmake -A Win32 ^
-          -DTON_USE_ROCKSDB=OFF ^
-          -DTON_USE_ABSEIL=OFF ^
-          -DTON_ARCH= ^
-          -DTON_ONLY_TONLIB=ON ^
-          -DOPENSSL_FOUND=1 ^
-          -DOPENSSL_INCLUDE_DIR=%LibrariesPath%\openssl_1_1_1\include ^
-          -DOPENSSL_CRYPTO_LIBRARY=%LibrariesPath%\openssl_1_1_1\out32.dbg\libcrypto.lib ^
-          -DZLIB_FOUND=1 ^
-          -DZLIB_INCLUDE_DIR=%LibrariesPath%\zlib ^
-          -DZLIB_LIBRARY=%LibrariesPath%\zlib\contrib\vstudio\vc14\x86\ZlibStatDebug\zlibstat.lib ^
-          -DCMAKE_CXX_FLAGS_DEBUG="/DZLIB_WINAPI /DNDEBUG /MTd /Zi /Od /Ob0" ^
-          -DCMAKE_C_FLAGS_DEBUG="/DNDEBUG /MTd /Zi /Od /Ob0" ^
-          -DCMAKE_EXE_LINKER_FLAGS="/SAFESEH:NO Ws2_32.lib Gdi32.lib Advapi32.lib Crypt32.lib User32.lib" ^
-          ..
+          if "{{ matrix.build }}" == "Debug" (
+            mkdir build-debug
+            cd build-debug
 
-          cmake --build . --target tonlib --config Debug
+            cmake -A Win32 ^
+            -DTON_USE_ROCKSDB=OFF ^
+            -DTON_USE_ABSEIL=OFF ^
+            -DTON_ARCH= ^
+            -DTON_ONLY_TONLIB=ON ^
+            -DOPENSSL_FOUND=1 ^
+            -DOPENSSL_INCLUDE_DIR=%LibrariesPath%\openssl_1_1_1\include ^
+            -DOPENSSL_CRYPTO_LIBRARY=%LibrariesPath%\openssl_1_1_1\out32.dbg\libcrypto.lib ^
+            -DZLIB_FOUND=1 ^
+            -DZLIB_INCLUDE_DIR=%LibrariesPath%\zlib ^
+            -DZLIB_LIBRARY=%LibrariesPath%\zlib\contrib\vstudio\vc14\x86\ZlibStatDebug\zlibstat.lib ^
+            -DCMAKE_CXX_FLAGS_DEBUG="/DZLIB_WINAPI /DNDEBUG /MTd /Zi /Od /Ob0" ^
+            -DCMAKE_C_FLAGS_DEBUG="/DNDEBUG /MTd /Zi /Od /Ob0" ^
+            -DCMAKE_EXE_LINKER_FLAGS="/SAFESEH:NO Ws2_32.lib Gdi32.lib Advapi32.lib Crypt32.lib User32.lib" ^
+            ..
+          ) else (
+            mkdir build
+            cd build
+
+            cmake -A Win32 ^
+            -DTON_USE_ROCKSDB=OFF ^
+            -DTON_USE_ABSEIL=OFF ^
+            -DTON_ARCH= ^
+            -DTON_ONLY_TONLIB=ON ^
+            -DOPENSSL_FOUND=1 ^
+            -DOPENSSL_INCLUDE_DIR=%LibrariesPath%\openssl_1_1_1\include ^
+            -DOPENSSL_CRYPTO_LIBRARY=%LibrariesPath%\openssl_1_1_1\out32\libcrypto.lib ^
+            -DZLIB_FOUND=1 -DZLIB_INCLUDE_DIR=%LibrariesPath%\zlib ^
+            -DZLIB_LIBRARY=%LibrariesPath%\zlib\contrib\vstudio\vc14\x86\ZlibStatReleaseWithoutAsm\zlibstat.lib ^
+            -DCMAKE_CXX_FLAGS_RELEASE="/DZLIB_WINAPI /MT /Ob2" ^
+            -DCMAKE_C_FLAGS_RELEASE="/MT /Ob2" ^
+            -DCMAKE_EXE_LINKER_FLAGS="/SAFESEH:NO Ws2_32.lib Gdi32.lib Advapi32.lib Crypt32.lib User32.lib" ^
+            ..
+          )
+
+          cmake --build . --target tonlib --config ${{ matrix.build }}
 
       - name: Read defines.
         shell: bash
@@ -320,13 +349,13 @@ jobs:
 
           call vcvars32.bat
           cd ..\out
-          msbuild -m Wallet.sln /nologo /p:Configuration=Debug,Platform=Win32
+          msbuild -m Wallet.sln /nologo /p:Configuration=${{ matrix.build }},Platform=Win32
 
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         shell: cmd
         run: |
-          cd %REPO_NAME%\out\Debug
+          cd %REPO_NAME%\out\${{ matrix.build }}
           mkdir artifact
           move Wallet.exe artifact/
           move Updater.exe artifact/
@@ -334,5 +363,5 @@ jobs:
         name: Upload artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         with:
-          name: Wallet
-          path: ${{ env.REPO_NAME }}\out\Debug\artifact\
+          name: Wallet (${{ matrix.build }})
+          path: ${{ env.REPO_NAME }}\out\${{ matrix.build }}\artifact\

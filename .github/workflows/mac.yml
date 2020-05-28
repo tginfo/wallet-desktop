@@ -20,6 +20,10 @@ jobs:
       matrix:
         defines:
           - ""
+        build:
+          - "Debug"
+          - "Release"
+
     env:
       MIN_MAC: "-mmacosx-version-min=10.12"
       UNGUARDED: "-Werror=unguarded-availability-new"
@@ -162,7 +166,7 @@ jobs:
           git checkout d62d6c6556
           cd ../../..
           build/gyp_crashpad.py -Dmac_deployment_target=10.10
-          ninja -C out/Debug
+          ninja -C out/${{ matrix.build }}
       - name: Qt 5.12.8 cache.
         id: cache-qt
         uses: actions/cache@v1
@@ -189,10 +193,15 @@ jobs:
           cd qtbase
           git apply ../../patches/qtbase_$QT.diff
           cd ..
+
+          CONFIGURE_PARAMS="-release "
+          if [ "${{ matrix.build }}" = "Debug" ]; then
+            CONFIGURE_PARAMS="-debug -force-debug-info "
+          fi
+
           ./configure \
           -prefix "$QT_PREFIX" \
-          -debug \
-          -force-debug-info \
+          $CONFIGURE_PARAMS \
           -opensource \
           -confirm-license \
           -static \
@@ -226,8 +235,16 @@ jobs:
           git checkout $TON_COMMIT
           git submodule init
           git submodule update third-party/crc32c
-          mkdir build-debug
-          cd build-debug
+
+          TON_FOLDER="build"
+          TON_BUILD_TYPE="-DCMAKE_BUILD_TYPE=Release"
+          if [ "${{ matrix.build }}" = "Debug" ]; then
+            TON_FOLDER="build-debug"
+            TON_BUILD_TYPE=""
+          fi
+
+          mkdir $TON_FOLDER
+          cd $TON_FOLDER
           
           cmake \
           -DTON_USE_ROCKSDB=OFF \
@@ -242,6 +259,7 @@ jobs:
           -DZLIB_LIBRARY=/usr/local/macos/lib/libz.a \
           -DCMAKE_OSX_DEPLOYMENT_TARGET:STRING=10.12 \
           -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+          $TON_BUILD_TYPE \
           ..
 
           make -j$(nproc) tonlib
@@ -257,17 +275,17 @@ jobs:
           fi
           ./configure.sh -D DESKTOP_APP_USE_PACKAGED=OFF $DEFINE
           cd ../out
-          xcoderun='xcodebuild build -project Wallet.xcodeproj -scheme Wallet -destination "platform=macOS,arch=x86_64" -configuration Debug'
+          xcoderun='xcodebuild build -project Wallet.xcodeproj -scheme Wallet -destination "platform=macOS,arch=x86_64" -configuration ${{ matrix.build }}'
           bash -c "$xcoderun" || bash -c "$xcoderun" || bash -c "$xcoderun"
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          cd $REPO_NAME/out/Debug
+          cd $REPO_NAME/out/${{ matrix.build }}
           mkdir artifact
           mv Wallet.app artifact/
       - uses: actions/upload-artifact@master
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
         with:
-          name: Wallet
-          path: ${{ env.REPO_NAME }}/out/Debug/artifact/
+          name: Wallet (${{ matrix.build }})
+          path: ${{ env.REPO_NAME }}/out/${{ matrix.build }}/artifact/

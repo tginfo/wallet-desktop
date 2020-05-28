@@ -21,6 +21,9 @@ jobs:
       matrix:
         defines:
           - ""
+        build:
+          - "Debug"
+          - "Release"
 
     env:
       GIT: "https://github.com"
@@ -203,9 +206,13 @@ jobs:
           git clone $GIT/desktop-app/nimf.git
           cd ../../../..
 
+          CONFIGURE_PARAMS="-release "
+          if [ "${{ matrix.build }}" = "Debug" ]; then
+            CONFIGURE_PARAMS="-debug -force-debug-info "
+          fi
+
           ./configure -prefix "$LibrariesPath/qt-cache" \
-          -debug \
-          -force-debug-info \
+          $CONFIGURE_PARAMS \
           -opensource \
           -confirm-license \
           -qt-zlib \
@@ -306,8 +313,16 @@ jobs:
           git checkout $TON_COMMIT
           git submodule init
           git submodule update third-party/crc32c
-          mkdir build-debug
-          cd build-debug
+
+          TON_FOLDER="build"
+          TON_BUILD_TYPE="-DCMAKE_BUILD_TYPE=Release"
+          if [ "${{ matrix.build }}" = "Debug" ]; then
+            TON_FOLDER="build-debug"
+            TON_BUILD_TYPE=""
+          fi
+
+          mkdir $TON_FOLDER
+          cd $TON_FOLDER
           
           cmake \
           -DTON_USE_ROCKSDB=OFF \
@@ -317,6 +332,7 @@ jobs:
           -DOPENSSL_INCLUDE_DIR=/usr/local/desktop-app/openssl-1.1.1/include \
           -DOPENSSL_CRYPTO_LIBRARY=/usr/local/desktop-app/openssl-1.1.1/lib/libcrypto.a \
           -DTON_ARCH=`uname -m | sed --expression='s/_/-/g'` \
+          $TON_BUILD_TYPE \
           ..
 
           make -j$(nproc) tonlib
@@ -338,13 +354,13 @@ jobs:
           -D DESKTOP_APP_USE_PACKAGED=OFF \
           $DEFINE
 
-          cd ../out/Debug
+          cd ../out/${{ matrix.build }}
           make -j$(nproc)
 
       - name: Check.
         if: env.ONLY_CACHE == 'false'
         run: |
-          filePath="$REPO_NAME/out/Debug/bin/Wallet"
+          filePath="$REPO_NAME/out/${{ matrix.build }}/bin/Wallet"
           if test -f "$filePath"; then
             echo "Build successfully done! :)"
 
@@ -358,12 +374,12 @@ jobs:
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
         run: |
-          cd $REPO_NAME/out/Debug/bin
+          cd $REPO_NAME/out/${{ matrix.build }}/bin
           mkdir artifact
           mv Wallet artifact/
       - uses: actions/upload-artifact@master
         if: env.UPLOAD_ARTIFACT == 'true'
         name: Upload artifact.
         with:
-          name: Wallet
-          path: ${{ env.REPO_NAME }}/out/Debug/bin/artifact/
+          name: Wallet (${{ matrix.build }})
+          path: ${{ env.REPO_NAME }}/out/${{ matrix.build }}/bin/artifact/
