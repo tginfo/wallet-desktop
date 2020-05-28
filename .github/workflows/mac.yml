@@ -31,7 +31,7 @@ jobs:
       OPENSSL_VER: "1_1_1"
       QT_PREFIX: "/usr/local/desktop-app/Qt-5.12.8"
       LIBICONV_VER: "libiconv-1.15"
-      UPLOAD_ARTIFACT: "false"
+      UPLOAD_ARTIFACT: "true"
       ONLY_CACHE: "false"
       MANUAL_CACHING: "1"
       DOC_PATH: "docs/building-xcode.md"
