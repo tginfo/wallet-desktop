@@ -1,3 +1,6 @@
+[submodule "Wallet/ThirdParty/range-v3"]
+	path = Wallet/ThirdParty/range-v3
+	url = https://github.com/ericniebler/range-v3.git
 [submodule "Wallet/ThirdParty/variant"]
 	path = Wallet/ThirdParty/variant
 	url = https://github.com/desktop-app/variant.git
