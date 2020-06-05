@@ -320,7 +320,7 @@ jobs:
 
           call vcvars32.bat
           cd ..\out
-          msbuild -m Wallet.sln /nologo /p:Configuration=Debug,Platform=Win32
+          msbuild Wallet.sln /nologo /p:Configuration=Debug,Platform=Win32
 
       - name: Move artifact.
         if: env.UPLOAD_ARTIFACT == 'true'
